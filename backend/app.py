@@ -1,13 +1,10 @@
 import math
-from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
 
-from app.data import (
+from backend.data import (
     build_lineage_index,
     get_all_tables,
     get_cost_per_flow_data,
@@ -42,8 +39,7 @@ def organizations():
     df = get_organizations_data()
     if df.empty:
         return []
-    names = sorted(df["kbc_organization"].dropna().unique().tolist())
-    return names
+    return sorted(df["kbc_organization"].dropna().unique().tolist())
 
 
 # ── ROI ───────────────────────────────────────────────────────────────────────
@@ -147,31 +143,6 @@ def impact_analysis(table: str, org: str = "All Organizations"):
         "affected_tables": list(affected),
         "total_dependencies": len(unique),
     }
-
-
-# ── Serve React SPA ───────────────────────────────────────────────────────────
-# Vite builds to /app/static/ (outDir: '../static' in vite.config.js)
-# setup.sh runs `npm run build` before starting uvicorn, so this dir exists at runtime.
-
-_static_dir = Path(__file__).parent.parent / "static"
-_assets_dir = _static_dir / "assets"
-
-if _assets_dir.exists():
-    app.mount("/assets", StaticFiles(directory=str(_assets_dir)), name="assets")
-
-
-@app.get("/{full_path:path}", include_in_schema=False)
-def serve_spa(full_path: str):
-    # Serve exact static files first (favicon, robots.txt, etc.)
-    if full_path:
-        candidate = _static_dir / full_path
-        if candidate.is_file():
-            return FileResponse(str(candidate))
-    # Fall back to index.html for SPA client-side routing
-    index = _static_dir / "index.html"
-    if index.exists():
-        return FileResponse(str(index))
-    raise HTTPException(status_code=503, detail="Frontend not built yet. Run: cd frontend && npm run build")
 
 
 # ── Util ──────────────────────────────────────────────────────────────────────

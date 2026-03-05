@@ -6,7 +6,7 @@ from typing import Optional
 import pandas as pd
 from cachetools import TTLCache
 
-from app.query import query_data
+from backend.query import query_data
 
 # ── TTL cache (5 min, matching original Streamlit ttl=300) ────────────────────
 _cache: TTLCache = TTLCache(maxsize=64, ttl=300)

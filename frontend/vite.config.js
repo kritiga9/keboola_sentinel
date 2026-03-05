@@ -7,15 +7,13 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        target: 'http://localhost:8050',
         changeOrigin: true,
       },
     },
   },
   build: {
-    // Output to ../static so FastAPI (running from /app) serves from /app/static
-    outDir: '../static',
-    emptyOutDir: true,
+    outDir: 'dist',
     sourcemap: false,
   },
 })

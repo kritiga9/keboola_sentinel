@@ -1,13 +1,15 @@
 #!/bin/bash
 set -Eeuo pipefail
 
-echo "==> Installing frontend dependencies and building..."
-cd /app/frontend
-npm install
-npm run build
-
-echo "==> Installing Python dependencies..."
+echo "=== Installing Python dependencies ==="
 cd /app
 uv sync
 
-echo "==> Setup complete."
+echo "=== Installing frontend dependencies ==="
+cd /app/frontend
+/usr/local/bin/npm install
+
+echo "=== Building frontend ==="
+/usr/local/bin/npm run build
+
+echo "=== Setup complete ==="
