@@ -181,7 +181,7 @@ wheels = [
 [[package]]
 name = "keboola-sentinel"
 version = "1.0.0"
-source = { editable = "." }
+source = { virtual = "." }
 dependencies = [
     { name = "cachetools" },
     { name = "fastapi" },
