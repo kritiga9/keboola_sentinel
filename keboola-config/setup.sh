@@ -7,9 +7,9 @@ uv sync
 
 echo "=== Installing frontend dependencies ==="
 cd /app/frontend
-/usr/local/bin/npm install
+npm install
 
 echo "=== Building frontend ==="
-/usr/local/bin/npm run build
+npm run build
 
 echo "=== Setup complete ==="

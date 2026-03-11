@@ -114,7 +114,7 @@ def escape_sql_string(value: Optional[str]) -> Optional[str]:
 def safe_datetime_convert(series: pd.Series) -> pd.Series:
     try:
         result = pd.to_datetime(series, errors="coerce", utc=True)
-        return result.dt.tz_localize(None)
+        return result.dt.tz_convert(None)
     except Exception:
         return pd.Series([pd.NaT] * len(series))
 
