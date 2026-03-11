@@ -30,20 +30,6 @@ ORGANIZATIONS_FQN = '"KBC_USE4_37"."out.c-kbc_public_telemetry"."kbc_organizatio
 CONFIGS_FQN = '"KBC_USE4_37"."out.c-kbc_billing"."kbc_component_configuration"'
 JOBS_FQN = '"KBC_USE4_37"."out.c-kbc_billing"."kbc_job"'
 
-MULTI_TENANT_STACK = "Multi-tenant"
-
-SINGLE_TENANT_ORG_TABLES = [
-    ('"KBC_USE4_33"."in.c-raw-data"."connection-bi-organizations"', "Coates"),
-    ('"KBC_USE4_34"."in.c-raw-data"."connection-bi-organizations"', "Creditinfo"),
-    ('"KBC_USE4_35"."in.c-raw-data"."connection-bi-organizations"', "CSAS"),
-    ('"KBC_USE4_20"."in.c-raw-data"."connection-bi-organizations"', "Groupon"),
-    ('"KBC_USE4_21"."in.c-raw-data"."connection-bi-organizations"', "HCI"),
-    ('"KBC_USE4_286"."in.c-raw-data"."connection-bi-organizations"', "HCKZ"),
-    ('"KBC_USE4_22"."in.c-raw-data"."connection-bi-organizations"', "Innogy Hub"),
-    ('"KBC_USE4_377"."in.c-raw-data"."connection-bi-organizations"', "Pasha"),
-    ('"KBC_USE4_69"."in.c-raw-data"."connection-bi-organizations"', "RBI"),
-    ('"KBC_USE4_23"."in.c-raw-data"."connection-bi-organizations"', "SLSP"),
-]
 
 COMPONENT_FRIENDLY_NAMES = {
     "ex-salesforce": "Salesforce CRM",
@@ -181,8 +167,7 @@ def generate_use_case_summary(config_json_str: Optional[str]) -> str:
 def _build_org_join_where(org_filter: Optional[str], table_alias: str = "t") -> tuple[str, str]:
     if not org_filter or org_filter == "All Organizations":
         return "", ""
-    base_org = org_filter.split(" [")[0] if " [" in org_filter else org_filter
-    escaped = escape_sql_string(base_org)
+    escaped = escape_sql_string(org_filter)
     join = f"""
         INNER JOIN {PROJECTS_FQN} p ON {table_alias}."kbc_project_id" = p."kbc_project_id"
         INNER JOIN {ORGANIZATIONS_FQN} o ON p."kbc_organization_id" = o."kbc_organization_id"
@@ -194,39 +179,41 @@ def _build_org_join_where(org_filter: Optional[str], table_alias: str = "t") -> 
 # ── Data loaders ──────────────────────────────────────────────────────────────
 
 def get_stacks() -> list:
-    return [MULTI_TENANT_STACK] + [name for _, name in SINGLE_TENANT_ORG_TABLES]
+    def _load():
+        try:
+            df = query_data(f"""
+                SELECT SPLIT_PART("kbc_organization_url", '/', 3) AS "connection_url",
+                       COUNT(*) AS "org_count"
+                FROM {ORGANIZATIONS_FQN}
+                WHERE "kbc_organization_url" IS NOT NULL AND "kbc_organization_url" != ''
+                GROUP BY 1
+                ORDER BY 2 DESC
+            """)
+            if df.empty:
+                return []
+            return df["connection_url"].dropna().tolist()
+        except Exception:
+            return []
+    return _cached("stacks", _load)
 
 
 def get_organizations_data(stack: Optional[str] = None) -> pd.DataFrame:
     def _load():
         empty = pd.DataFrame(columns=["kbc_organization_id", "kbc_organization"])
-
-        # Multi-tenant stack — query the shared telemetry table
-        if not stack or stack == MULTI_TENANT_STACK:
-            try:
+        try:
+            if not stack:
                 return query_data(f"""
                     SELECT "kbc_organization_id", "kbc_organization"
                     FROM {ORGANIZATIONS_FQN}
                     ORDER BY "kbc_organization"
                 """)
-            except Exception:
-                return empty
-
-        # Single-tenant stack — query only that stack's org table
-        entry = next(((fqn, name) for fqn, name in SINGLE_TENANT_ORG_TABLES if name == stack), None)
-        if not entry:
-            return empty
-        fqn, stack_name = entry
-        try:
-            df = query_data(f"""
-                SELECT "id" as "kbc_organization_id", "name" as "kbc_organization"
-                FROM {fqn}
-                WHERE "isDeleted" = 'false' OR "isDeleted" IS NULL OR "isDeleted" = '0'
-                LIMIT 200
+            escaped_stack = escape_sql_string(stack)
+            return query_data(f"""
+                SELECT "kbc_organization_id", "kbc_organization"
+                FROM {ORGANIZATIONS_FQN}
+                WHERE SPLIT_PART("kbc_organization_url", '/', 3) = '{escaped_stack}'
+                ORDER BY "kbc_organization"
             """)
-            if not df.empty:
-                df["kbc_organization"] = df["kbc_organization"] + f" [{stack_name}]"
-            return df
         except Exception:
             return empty
 

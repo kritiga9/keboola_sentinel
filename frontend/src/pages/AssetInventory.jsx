@@ -20,7 +20,7 @@ function fmtBytes(bytes) {
   return `${(bytes / 1e3).toFixed(0)} KB`
 }
 
-export default function AssetInventory({ selectedOrg }) {
+export default function AssetInventory({ selectedOrg, selectedStack }) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -86,6 +86,18 @@ export default function AssetInventory({ selectedOrg }) {
           </div>
 
           <div className="divider" />
+
+          {/* No telemetry notice */}
+          {tables.length === 0 && (
+            <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-sm">
+              <p className="font-semibold mb-1">No table telemetry data available</p>
+              <p className="text-amber-700">
+                {selectedStack && selectedStack.includes('.keboola.cloud')
+                  ? `Table telemetry is not collected for the private stack "${selectedStack}". ROI data is still available.`
+                  : 'No tables found for the selected filters.'}
+              </p>
+            </div>
+          )}
 
           {/* Filters */}
           <div className="flex flex-wrap gap-3 mb-6">

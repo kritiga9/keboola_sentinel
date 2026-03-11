@@ -30,9 +30,9 @@ export default function App() {
   }, [selectedStack])
 
   const pages = {
-    roi:       <ROIAnalysis selectedOrg={selectedOrg} />,
-    inventory: <AssetInventory selectedOrg={selectedOrg} />,
-    impact:    <ImpactAnalysis selectedOrg={selectedOrg} />,
+    roi:       <ROIAnalysis selectedOrg={selectedOrg} selectedStack={selectedStack} />,
+    inventory: <AssetInventory selectedOrg={selectedOrg} selectedStack={selectedStack} />,
+    impact:    <ImpactAnalysis selectedOrg={selectedOrg} selectedStack={selectedStack} />,
   }
 
   return (

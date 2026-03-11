@@ -190,7 +190,7 @@ function DependencyGraph({ writers, readers, tableName }) {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-export default function ImpactAnalysis({ selectedOrg }) {
+export default function ImpactAnalysis({ selectedOrg, selectedStack }) {
   const [tables, setTables] = useState([])
   const [tablesLoading, setTablesLoading] = useState(false)
   const [selectedTable, setSelectedTable] = useState('')
@@ -243,7 +243,13 @@ export default function ImpactAnalysis({ selectedOrg }) {
       {!tablesLoading && tables.length === 0 && (
         <div className="card p-12 text-center text-slate-400">
           <p className="text-base font-medium">No tables found</p>
-          <p className="text-sm mt-1">Try selecting a different organization.</p>
+          {selectedStack && selectedStack.includes('.keboola.cloud') ? (
+            <p className="text-sm mt-1 text-amber-600">
+              Table telemetry is not collected for the private stack &quot;{selectedStack}&quot;. ROI data is still available.
+            </p>
+          ) : (
+            <p className="text-sm mt-1">Try selecting a different organization.</p>
+          )}
         </div>
       )}
 
