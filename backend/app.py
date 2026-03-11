@@ -12,6 +12,7 @@ from backend.data import (
     get_organizations_data,
     get_project_id_mapping,
     get_project_names,
+    get_stacks,
     get_table_url,
 )
 
@@ -32,11 +33,18 @@ def health():
     return {"status": "ok"}
 
 
+# ── Stacks ────────────────────────────────────────────────────────────────────
+
+@app.get("/api/stacks")
+def stacks():
+    return get_stacks()
+
+
 # ── Organizations ─────────────────────────────────────────────────────────────
 
 @app.get("/api/organizations")
-def organizations():
-    df = get_organizations_data()
+def organizations(stack: Optional[str] = None):
+    df = get_organizations_data(stack)
     if df.empty:
         return []
     return sorted(df["kbc_organization"].dropna().unique().tolist())

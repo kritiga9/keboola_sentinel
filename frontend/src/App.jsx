@@ -3,18 +3,31 @@ import Sidebar from './components/Sidebar.jsx'
 import ROIAnalysis from './pages/ROIAnalysis.jsx'
 import AssetInventory from './pages/AssetInventory.jsx'
 import ImpactAnalysis from './pages/ImpactAnalysis.jsx'
-import { fetchOrganizations } from './api/client.js'
+import { fetchStacks, fetchOrganizations } from './api/client.js'
 
 export default function App() {
   const [page, setPage] = useState('roi')
-  const [selectedOrg, setSelectedOrg] = useState('All Organizations')
-  const [orgs, setOrgs] = useState([])
 
+  const [stacks, setStacks] = useState([])
+  const [selectedStack, setSelectedStack] = useState('')
+
+  const [orgs, setOrgs] = useState([])
+  const [selectedOrg, setSelectedOrg] = useState('All Organizations')
+
+  // Load stack list once on mount
   useEffect(() => {
-    fetchOrganizations()
-      .then(setOrgs)
-      .catch(console.error)
+    fetchStacks().catch(console.error).then(s => setStacks(s ?? []))
   }, [])
+
+  // When stack changes, reset org and reload org list
+  useEffect(() => {
+    setSelectedOrg('All Organizations')
+    setOrgs([])
+    if (!selectedStack) return
+    fetchOrganizations(selectedStack)
+      .then(o => setOrgs(o ?? []))
+      .catch(console.error)
+  }, [selectedStack])
 
   const pages = {
     roi:       <ROIAnalysis selectedOrg={selectedOrg} />,
@@ -27,11 +40,13 @@ export default function App() {
       <Sidebar
         page={page}
         setPage={setPage}
+        stacks={stacks}
+        selectedStack={selectedStack}
+        setSelectedStack={setSelectedStack}
+        orgs={orgs}
         selectedOrg={selectedOrg}
         setSelectedOrg={setSelectedOrg}
-        orgs={orgs}
       />
-      {/* Main content offset for fixed sidebar */}
       <main className="ml-64 flex-1 min-w-0">
         <div className="max-w-7xl mx-auto px-8 py-8">
           {pages[page]}

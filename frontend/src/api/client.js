@@ -9,7 +9,10 @@ async function apiFetch(path) {
   return res.json()
 }
 
-export const fetchOrganizations = () => apiFetch('/api/organizations')
+export const fetchStacks = () => apiFetch('/api/stacks')
+
+export const fetchOrganizations = (stack) =>
+  apiFetch(`/api/organizations${stack ? '?' + new URLSearchParams({ stack }) : ''}`)
 
 export const fetchRoi = (org, startDate, endDate) => {
   const params = new URLSearchParams({ org })

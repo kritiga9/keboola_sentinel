@@ -1,6 +1,5 @@
 import json
 import threading
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from typing import Optional
 
@@ -30,6 +29,8 @@ PROJECTS_FQN = '"KBC_USE4_37"."out.c-kbc_public_telemetry"."kbc_project"'
 ORGANIZATIONS_FQN = '"KBC_USE4_37"."out.c-kbc_public_telemetry"."kbc_organization"'
 CONFIGS_FQN = '"KBC_USE4_37"."out.c-kbc_billing"."kbc_component_configuration"'
 JOBS_FQN = '"KBC_USE4_37"."out.c-kbc_billing"."kbc_job"'
+
+MULTI_TENANT_STACK = "Multi-tenant"
 
 SINGLE_TENANT_ORG_TABLES = [
     ('"KBC_USE4_33"."in.c-raw-data"."connection-bi-organizations"', "Coates"),
@@ -192,52 +193,44 @@ def _build_org_join_where(org_filter: Optional[str], table_alias: str = "t") -> 
 
 # ── Data loaders ──────────────────────────────────────────────────────────────
 
-def _fetch_single_tenant_org(fqn: str, stack_name: str) -> Optional[pd.DataFrame]:
-    try:
-        df = query_data(f"""
-            SELECT "id" as "kbc_organization_id", "name" as "kbc_organization"
-            FROM {fqn}
-            WHERE "isDeleted" = 'false' OR "isDeleted" IS NULL OR "isDeleted" = '0'
-            LIMIT 100
-        """)
-        if not df.empty:
-            df["kbc_organization"] = df["kbc_organization"] + f" [{stack_name}]"
-            return df
-    except Exception:
-        pass
-    return None
+def get_stacks() -> list:
+    return [MULTI_TENANT_STACK] + [name for _, name in SINGLE_TENANT_ORG_TABLES]
 
 
-def get_organizations_data() -> pd.DataFrame:
+def get_organizations_data(stack: Optional[str] = None) -> pd.DataFrame:
     def _load():
-        all_orgs = []
+        empty = pd.DataFrame(columns=["kbc_organization_id", "kbc_organization"])
 
-        with ThreadPoolExecutor(max_workers=11) as pool:
-            futures = {
-                pool.submit(query_data, f"""
+        # Multi-tenant stack — query the shared telemetry table
+        if not stack or stack == MULTI_TENANT_STACK:
+            try:
+                return query_data(f"""
                     SELECT "kbc_organization_id", "kbc_organization"
                     FROM {ORGANIZATIONS_FQN}
                     ORDER BY "kbc_organization"
-                """): None,
-                **{
-                    pool.submit(_fetch_single_tenant_org, fqn, stack_name): stack_name
-                    for fqn, stack_name in SINGLE_TENANT_ORG_TABLES
-                },
-            }
-            for future in as_completed(futures):
-                try:
-                    result = future.result()
-                    if result is not None and not result.empty:
-                        all_orgs.append(result)
-                except Exception:
-                    pass
+                """)
+            except Exception:
+                return empty
 
-        if all_orgs:
-            combined = pd.concat(all_orgs, ignore_index=True)
-            return combined.drop_duplicates(subset=["kbc_organization"])
-        return pd.DataFrame(columns=["kbc_organization_id", "kbc_organization"])
+        # Single-tenant stack — query only that stack's org table
+        entry = next(((fqn, name) for fqn, name in SINGLE_TENANT_ORG_TABLES if name == stack), None)
+        if not entry:
+            return empty
+        fqn, stack_name = entry
+        try:
+            df = query_data(f"""
+                SELECT "id" as "kbc_organization_id", "name" as "kbc_organization"
+                FROM {fqn}
+                WHERE "isDeleted" = 'false' OR "isDeleted" IS NULL OR "isDeleted" = '0'
+                LIMIT 200
+            """)
+            if not df.empty:
+                df["kbc_organization"] = df["kbc_organization"] + f" [{stack_name}]"
+            return df
+        except Exception:
+            return empty
 
-    return _cached("orgs", _load)
+    return _cached(f"orgs:{stack}", _load)
 
 
 def get_governance_data(org_filter: Optional[str] = None) -> pd.DataFrame:
