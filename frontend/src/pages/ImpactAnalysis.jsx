@@ -6,23 +6,54 @@ import { fetchImpactTables, fetchImpactAnalysis } from '../api/client.js'
 
 // ── Dependency graph rendered as SVG ─────────────────────────────────────────
 
-const NODE_W = 170
-const NODE_H = 52
-const COL_GAP = 100
-const ROW_GAP = 18
-const PAD = 24
+const NODE_W   = 192
+const NODE_H   = 62
+const COL_GAP  = 110
+const ROW_GAP  = 14
+const PAD_X    = 28
+const PAD_TOP  = 28
+const PAD_BOT  = 44   // extra bottom space for legend
 
 function truncate(str, n) {
-  return str.length > n ? str.slice(0, n) + '…' : str
+  return str.length > n ? str.slice(0, n - 1) + '…' : str
 }
 
 function nodeColor(type, side) {
-  if (side === 'center') return { fill: '#3b82f6', text: '#fff', border: '#1d4ed8' }
-  if (side === 'writer')  return { fill: '#16a34a', text: '#fff', border: '#15803d' }
+  if (side === 'center') return { fill: '#2563eb', text: '#fff', border: '#1d4ed8', shadow: '#bfdbfe' }
+  if (side === 'writer') return { fill: '#16a34a', text: '#fff', border: '#15803d', shadow: '#bbf7d0' }
   const t = (type || '').toLowerCase()
-  if (t.includes('transformation')) return { fill: '#ca8a04', text: '#fff', border: '#a16207' }
-  if (t.includes('writer'))         return { fill: '#dc2626', text: '#fff', border: '#b91c1c' }
-  return { fill: '#64748b', text: '#fff', border: '#475569' }
+  if (t.includes('transformation')) return { fill: '#d97706', text: '#fff', border: '#b45309', shadow: '#fde68a' }
+  if (t.includes('writer'))         return { fill: '#dc2626', text: '#fff', border: '#b91c1c', shadow: '#fecaca' }
+  return { fill: '#475569', text: '#fff', border: '#334155', shadow: '#cbd5e1' }
+}
+
+function Node({ x, y, label, sub, color, isCenter }) {
+  return (
+    <g>
+      {/* Shadow */}
+      <rect x={x + 2} y={y + 3} width={NODE_W} height={NODE_H} rx="10"
+        fill={color.shadow} opacity="0.5" />
+      {/* Body */}
+      <rect x={x} y={y} width={NODE_W} height={NODE_H} rx="10"
+        fill={color.fill} stroke={color.border} strokeWidth={isCenter ? 2 : 1.5} />
+      {/* Label */}
+      <text
+        x={x + NODE_W / 2} y={y + 24}
+        fill={color.text} fontSize="11.5" fontWeight="600"
+        textAnchor="middle" dominantBaseline="middle"
+      >
+        {truncate(label, 24)}
+      </text>
+      {/* Sub-label */}
+      <text
+        x={x + NODE_W / 2} y={y + 42}
+        fill={color.text} fontSize="9.5" opacity="0.75"
+        textAnchor="middle" dominantBaseline="middle"
+      >
+        {truncate(sub, 26)}
+      </text>
+    </g>
+  )
 }
 
 function DependencyGraph({ writers, readers, tableName }) {
@@ -30,54 +61,67 @@ function DependencyGraph({ writers, readers, tableName }) {
   const rightCount = readers.length
   const maxRows    = Math.max(leftCount, rightCount, 1)
 
-  const totalH = PAD * 2 + maxRows * NODE_H + (maxRows - 1) * ROW_GAP
-  const totalW = PAD * 2 + NODE_W * 3 + COL_GAP * 2
+  const innerH = maxRows * NODE_H + (maxRows - 1) * ROW_GAP
+  const totalH = PAD_TOP + innerH + PAD_BOT
+  const totalW = PAD_X * 2 + NODE_W * 3 + COL_GAP * 2
 
-  const centerX = PAD + NODE_W + COL_GAP
-  const centerY = totalH / 2 - NODE_H / 2
+  const centerX = PAD_X + NODE_W + COL_GAP
+  const centerY = PAD_TOP + (innerH - NODE_H) / 2
 
   function rowY(count, i) {
     const blockH = count * NODE_H + (count - 1) * ROW_GAP
-    const startY = (totalH - blockH) / 2
+    const startY = PAD_TOP + (innerH - blockH) / 2
     return startY + i * (NODE_H + ROW_GAP)
   }
 
   const writerNodes = writers.map((w, i) => ({
-    x: PAD,
-    y: rowY(Math.max(leftCount, 1), i),
-    label: truncate(w.config_name, 22),
-    sub:   truncate(w.component_name, 20),
+    x:     PAD_X,
+    y:     rowY(Math.max(leftCount, 1), i),
+    label: w.config_name,
+    sub:   w.component_name,
     color: nodeColor(w.component_type, 'writer'),
   }))
 
   const readerNodes = readers.map((r, i) => ({
-    x: PAD + NODE_W * 2 + COL_GAP * 2,
-    y: rowY(Math.max(rightCount, 1), i),
-    label: truncate(r.config_name, 22),
-    sub:   truncate(r.component_name, 20),
+    x:     PAD_X + NODE_W * 2 + COL_GAP * 2,
+    y:     rowY(Math.max(rightCount, 1), i),
+    label: r.config_name,
+    sub:   r.component_name,
     color: nodeColor(r.component_type, 'reader'),
   }))
 
   const centerColor = nodeColor(null, 'center')
 
+  const isEmpty = writers.length === 0 && readers.length === 0
+  const svgH    = isEmpty ? 140 : Math.max(totalH, 140)
+
   return (
-    <div className="overflow-x-auto">
-      <svg width={totalW} height={Math.max(totalH, 120)} className="font-sans">
+    <div className="overflow-x-auto rounded-xl bg-slate-50 border border-slate-200 p-2">
+      <svg width={totalW} height={svgH} className="font-sans block">
+        <defs>
+          <marker id="arrowGreen" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto">
+            <path d="M0,0.5 L0,6.5 L8,3.5 z" fill="#16a34a" />
+          </marker>
+          <marker id="arrowSlate" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto">
+            <path d="M0,0.5 L0,6.5 L8,3.5 z" fill="#64748b" />
+          </marker>
+          <marker id="arrowRed" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto">
+            <path d="M0,0.5 L0,6.5 L8,3.5 z" fill="#dc2626" />
+          </marker>
+          <marker id="arrowAmber" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto">
+            <path d="M0,0.5 L0,6.5 L8,3.5 z" fill="#d97706" />
+          </marker>
+        </defs>
+
         {/* Writer → Center edges */}
         {writerNodes.map((w, i) => {
-          const x1 = w.x + NODE_W
-          const y1 = w.y + NODE_H / 2
-          const x2 = centerX
-          const y2 = centerY + NODE_H / 2
+          const x1 = w.x + NODE_W, y1 = w.y + NODE_H / 2
+          const x2 = centerX,      y2 = centerY + NODE_H / 2
           const mx = (x1 + x2) / 2
           return (
-            <path
-              key={`we-${i}`}
+            <path key={`we-${i}`}
               d={`M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`}
-              fill="none"
-              stroke="#16a34a"
-              strokeWidth="1.5"
-              strokeOpacity="0.6"
+              fill="none" stroke="#16a34a" strokeWidth="2" strokeOpacity="0.55"
               markerEnd="url(#arrowGreen)"
             />
           )
@@ -85,95 +129,58 @@ function DependencyGraph({ writers, readers, tableName }) {
 
         {/* Center → Reader edges */}
         {readerNodes.map((r, i) => {
-          const x1 = centerX + NODE_W
-          const y1 = centerY + NODE_H / 2
-          const x2 = r.x
-          const y2 = r.y + NODE_H / 2
+          const x1 = centerX + NODE_W, y1 = centerY + NODE_H / 2
+          const x2 = r.x,              y2 = r.y + NODE_H / 2
           const mx = (x1 + x2) / 2
+          const t  = (r.color.fill === '#dc2626' || r.color.fill === '#d97706')
+          const strokeColor = r.color.border
+          const markerId    = r.color.fill === '#d97706' ? 'arrowAmber'
+                            : r.color.fill === '#dc2626' ? 'arrowRed' : 'arrowSlate'
           return (
-            <path
-              key={`re-${i}`}
+            <path key={`re-${i}`}
               d={`M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`}
-              fill="none"
-              stroke="#dc2626"
-              strokeWidth="1.5"
-              strokeOpacity="0.6"
-              markerEnd="url(#arrowRed)"
+              fill="none" stroke={strokeColor} strokeWidth="2" strokeOpacity="0.55"
+              markerEnd={`url(#${markerId})`}
             />
           )
         })}
 
-        {/* Arrow markers */}
-        <defs>
-          <marker id="arrowGreen" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
-            <path d="M0,0 L0,6 L8,3 z" fill="#16a34a" fillOpacity="0.7" />
-          </marker>
-          <marker id="arrowRed" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
-            <path d="M0,0 L0,6 L8,3 z" fill="#dc2626" fillOpacity="0.7" />
-          </marker>
-        </defs>
-
         {/* Writer nodes */}
         {writerNodes.map((n, i) => (
-          <g key={`wn-${i}`}>
-            <rect x={n.x} y={n.y} width={NODE_W} height={NODE_H}
-              rx="8" fill={n.color.fill} stroke={n.color.border} strokeWidth="1" />
-            <text x={n.x + 10} y={n.y + 18} fill={n.color.text} fontSize="11" fontWeight="600">
-              {n.label}
-            </text>
-            <text x={n.x + 10} y={n.y + 33} fill={n.color.text} fontSize="9.5" opacity="0.8">
-              {n.sub}
-            </text>
-          </g>
+          <Node key={`wn-${i}`} {...n} />
         ))}
 
         {/* Center node */}
-        <g>
-          <rect
-            x={centerX} y={centerY} width={NODE_W} height={NODE_H}
-            rx="8"
-            fill={centerColor.fill}
-            stroke={centerColor.border}
-            strokeWidth="2"
-          />
-          <text x={centerX + NODE_W / 2} y={centerY + 22} fill="white" fontSize="11" fontWeight="700" textAnchor="middle">
-            {truncate(tableName, 22)}
-          </text>
-          <text x={centerX + NODE_W / 2} y={centerY + 36} fill="white" fontSize="9" opacity="0.8" textAnchor="middle">
-            selected table
-          </text>
-        </g>
+        <Node
+          x={centerX} y={centerY}
+          label={tableName} sub="selected table"
+          color={centerColor} isCenter
+        />
 
         {/* Reader nodes */}
         {readerNodes.map((n, i) => (
-          <g key={`rn-${i}`}>
-            <rect x={n.x} y={n.y} width={NODE_W} height={NODE_H}
-              rx="8" fill={n.color.fill} stroke={n.color.border} strokeWidth="1" />
-            <text x={n.x + 10} y={n.y + 18} fill={n.color.text} fontSize="11" fontWeight="600">
-              {n.label}
-            </text>
-            <text x={n.x + 10} y={n.y + 33} fill={n.color.text} fontSize="9.5" opacity="0.8">
-              {n.sub}
-            </text>
-          </g>
+          <Node key={`rn-${i}`} {...n} />
         ))}
 
         {/* Empty state */}
-        {writers.length === 0 && readers.length === 0 && (
-          <text x={totalW / 2} y={totalH / 2} fill="#94a3b8" fontSize="13" textAnchor="middle">
+        {isEmpty && (
+          <text x={totalW / 2} y={svgH / 2} fill="#94a3b8" fontSize="13"
+            textAnchor="middle" dominantBaseline="middle">
             No dependencies found for this table
           </text>
         )}
 
         {/* Legend */}
-        {(writers.length > 0 || readers.length > 0) && (
-          <g transform={`translate(${PAD}, ${totalH - 18})`}>
-            <rect width="10" height="10" rx="2" fill="#16a34a" y="-8" />
-            <text x="14" fontSize="9" fill="#64748b">Writes to table</text>
-            <rect x="100" width="10" height="10" rx="2" fill="#dc2626" y="-8" />
-            <text x="114" fontSize="9" fill="#64748b">Reads from table</text>
-            <rect x="220" width="10" height="10" rx="2" fill="#ca8a04" y="-8" />
-            <text x="234" fontSize="9" fill="#64748b">Transformation</text>
+        {!isEmpty && (
+          <g transform={`translate(${PAD_X}, ${svgH - 22})`}>
+            <rect width="11" height="11" rx="3" fill="#16a34a" y="-0.5" />
+            <text x="16" y="9" fontSize="10" fill="#64748b">Writes to table</text>
+            <rect x="118" width="11" height="11" rx="3" fill="#dc2626" y="-0.5" />
+            <text x="134" y="9" fontSize="10" fill="#64748b">Reads from table</text>
+            <rect x="254" width="11" height="11" rx="3" fill="#d97706" y="-0.5" />
+            <text x="270" y="9" fontSize="10" fill="#64748b">Transformation</text>
+            <rect x="364" width="11" height="11" rx="3" fill="#475569" y="-0.5" />
+            <text x="380" y="9" fontSize="10" fill="#64748b">Other</text>
           </g>
         )}
       </svg>

@@ -217,7 +217,6 @@ def get_organizations_data() -> pd.DataFrame:
                 pool.submit(query_data, f"""
                     SELECT "kbc_organization_id", "kbc_organization"
                     FROM {ORGANIZATIONS_FQN}
-                    WHERE "kbc_organization_is_deleted" = 'false' OR "kbc_organization_is_deleted" IS NULL
                     ORDER BY "kbc_organization"
                 """): None,
                 **{
